@@ -84,6 +84,7 @@ def main(hostname, router_ip='192.168.1.1', router_username='admin', router_pass
             print('{} Updated {} to A {} and AAAA {}'.format(
                 time.strftime('{%Y-%m-%dT%H:%M:%S}'), hostname, ipv4, ipv6))
             succeeded = True
+            previp4, previp6 = ipv4, ipv6
         except Exception as e:
             succeeded = False
             print('{} Update failed for {} to A {} and AAAA {}:'.format(
