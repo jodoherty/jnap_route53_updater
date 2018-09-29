@@ -21,17 +21,14 @@ def get_ips(ip, username, password):
     with urlopen(req) as f:
         res = json.loads(f.read().decode('utf-8'))
         ipv4_addr = None
-        ipv6_addr = None
         if res['output']['wanStatus'] == 'Connected':
             ipv4_addr = res['output']['wanConnection']['ipAddress']
         else:
             raise Exception('Missing ipv4 wan connection')
-        if res['output']['wanIPv6Status'] == 'Connected':
-            ipv6_addr = res['output']['wanIPv6Connection']['networkInfo']['ipAddress']
-        return ipv4_addr, ipv6_addr
+        return ipv4_addr
 
 
-def update_ips(hostname, region='us-east-1', zone_id=None, ipv4=None, ipv6=None, **kwargs):
+def update_ips(hostname, region='us-east-1', zone_id=None, ipv4=None, **kwargs):
     if ipv4 == None:
         raise TypeError('Missing ipv4 address')
     client = boto3.client('route53', **kwargs)
@@ -46,19 +43,6 @@ def update_ips(hostname, region='us-east-1', zone_id=None, ipv4=None, ipv6=None,
             },
         },
     ]
-    if ipv6 != None:
-        changes.append(
-            {
-                'Action': 'UPSERT',
-                'ResourceRecordSet': {
-                    'Name': hostname,
-                    'Type': 'AAAA',
-                    'TTL': 300,
-                    'ResourceRecords': [{'Value': ipv6}],
-                },
-            }
-        )
-
     response = client.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch={'Changes': changes})
@@ -67,28 +51,28 @@ def update_ips(hostname, region='us-east-1', zone_id=None, ipv4=None, ipv6=None,
 
 
 def main(hostname, router_ip='192.168.1.1', router_username='admin', router_password='password', **kwargs):
-    previpv4, previpv6 = None, None
+    previpv4 = None
     succeeded = False
     while True:
         try:
             print('{} Checking IP addresses'.format(
                 time.strftime('{%Y-%m-%dT%H:%M:%S}')))
-            ipv4, ipv6 = get_ips(router_ip, router_username, router_password)
-            if ipv4 == previpv4 and ipv6 == previpv6 and succeeded == True:
+            ipv4 = get_ip(router_ip, router_username, router_password)
+            if ipv4 == previpv4 and succeeded == True:
                 print('{} Nothing changed since last update. Skipping...'.format(
                     time.strftime('{%Y-%m-%dT%H:%M:%S}')))
                 continue
             print('{} Updating DNS entries'.format(
                 time.strftime('{%Y-%m-%dT%H:%M:%S}')))
-            update_ips(hostname, ipv4=ipv4, ipv6=ipv6, **kwargs)
-            print('{} Updated {} to A {} and AAAA {}'.format(
-                time.strftime('{%Y-%m-%dT%H:%M:%S}'), hostname, ipv4, ipv6))
+            update_ips(hostname, ipv4=ipv4, **kwargs)
+            print('{} Updated {} to A {}'.format(
+                time.strftime('{%Y-%m-%dT%H:%M:%S}'), hostname, ipv4))
             succeeded = True
-            previpv4, previpv6 = ipv4, ipv6
+            previpv4 = ipv4
         except Exception as e:
             succeeded = False
             print('{} Update failed for {} to A {} and AAAA {}:'.format(
-                time.strftime('{%Y-%m-%dT%H:%M:%S}'), hostname, ipv4, ipv6))
+                time.strftime('{%Y-%m-%dT%H:%M:%S}'), hostname, ipv4))
             print(e)
         finally:
             time.sleep(3600)
