@@ -9,7 +9,7 @@ import json
 import time
 
 
-def get_ips(ip, username, password):
+def get_ip(ip, username, password):
     url = 'http://{}/JNAP/'.format(ip)
     token = base64.b64encode('{}:{}'.format(username, password).encode('ascii')).decode('ascii')
     headers = {
